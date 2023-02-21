@@ -1,0 +1,66 @@
+buildscript {
+    repositories {
+        mavenCentral()
+        maven {
+            url "https://plugins.gradle.org/m2/"
+        }
+    }
+
+    dependencies {
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:${kotlinVersion}"
+    }
+}
+
+apply plugin: 'application'
+
+mainClassName = "it.guccidigital.GucciDemo1Kt"
+
+repositories {
+    mavenCentral()
+}
+
+apply plugin: 'kotlin'
+
+compileKotlin.kotlinOptions.jvmTarget = "11"
+compileTestKotlin.kotlinOptions.jvmTarget = "11"
+compileTestKotlin.kotlinOptions.freeCompilerArgs += "-Xjvm-default=all"
+
+sourceCompatibility = JavaVersion.VERSION_11
+targetCompatibility = JavaVersion.VERSION_11
+
+test {
+    useJUnitPlatform()
+}
+
+dependencies {
+    implementation "org.http4k:http4k-aws:${http4kVersion}"
+    implementation "org.http4k:http4k-core:${http4kVersion}"
+    implementation "org.http4k:http4k-format-jackson:${http4kVersion}"
+    implementation "org.http4k:http4k-template-freemarker:${http4kVersion}"
+
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:${kotlinVersion}"
+
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:${coroutinesVersion}"
+
+    implementation "aws.sdk.kotlin:s3:0.18.0-beta"
+    implementation "com.google.code.gson:gson:2.10.1"
+
+    implementation "org.slf4j:slf4j-log4j12:2.0.5"
+
+    implementation "software.amazon.awssdk:s3:${awsSdkVersion}"
+
+    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.4.0")
+
+    implementation platform("org.jetbrains.kotlin:kotlin-bom:${kotlinVersion}")
+    implementation platform("org.jetbrains.kotlinx:kotlinx-coroutines-bom:${kotlinxVersion}")
+    implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8")
+
+    implementation("org.apache.kafka:kafka-clients:$kafkaApiVersion")
+
+    testImplementation "org.http4k:http4k-testing-approval:${http4kVersion}"
+    testImplementation "org.junit.jupiter:junit-jupiter-api:${junitVersion}"
+    testImplementation "org.junit.jupiter:junit-jupiter-engine:${junitVersion}"
+}
+
