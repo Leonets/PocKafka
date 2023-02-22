@@ -36,9 +36,14 @@ fun main()  {
     // to inject the body into the message - this also works with Response
     val requestWithEmail = ordersLens(myOrders, Request(GET, "/"))
 
-    //executes the request
+    //executes the request vs mulesoft
+/*    val response: Response = printingClient(requestWithEmail.method(POST).uri(Uri.of( "http://localhost:9003/api/orders")))
+    println(" output  " + response.bodyString() )*/
+
+    //executes the request vs kotlin
     val response: Response = printingClient(requestWithEmail.method(POST).uri(Uri.of( "http://localhost:9002/orders")))
     println(" output  " + response.bodyString() )
+
 }
 
 

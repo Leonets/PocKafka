@@ -27,11 +27,8 @@ import java.lang.Thread.currentThread
 
 fun main() {
     val printingApp: HttpHandler = PrintRequest().then(app)
-
     val server = printingApp.asServer(SunHttp(httpPort)).start()
     println("Server started on " + server.port())
-
-
 
     runBlocking {
         //create gucci bucket
@@ -176,16 +173,16 @@ suspend fun manageOrders() {
 }
 
 private fun manageQueue(queueName: String, subsystem: String) {
-    kafkaConsumer.subscribe(listOf(queueName))
+    internalKafkaConsumer.subscribe(listOf(queueName))
     println(" \n Start polling over $queueName ")
-    val messages = pollMessage(kafkaConsumer)
+    val messages = pollMessage(internalKafkaConsumer)
     println("  message from $queueName to be managed " )
     //ask for execution to a subsytem
     messages?.map { singleMessage
         -> when(execute(singleMessage.value(), subsystem) == Status.OK) {
             true -> {
-                //deleteSQSMessage(queueName, singleMessage)
-                ackMessage(kafkaConsumer)
+                //ack the message !
+                ackMessage(internalKafkaConsumer)
             }
             false -> {
                 println(" subsystem unavailable $subsystem" )

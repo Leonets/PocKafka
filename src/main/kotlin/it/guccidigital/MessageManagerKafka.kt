@@ -40,14 +40,23 @@ val internalConsumerProps =
         "key.deserializer" to "org.apache.kafka.common.serialization.StringDeserializer",
         "value.deserializer" to "org.apache.kafka.common.serialization.StringDeserializer",
         "group.id" to "gucciInternalGroup",
-        "security.protocol" to "PLAINTEXT"
+        "security.protocol" to "PLAINTEXT",
+        "enable.auto.commit" to "false"
     )
 val internalKafkaConsumer = KafkaConsumer<String, String>(internalConsumerProps)
 
-/*
-consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);
-consumerProps.put(JsonDeSerializer.TYPE_MAPPINGS, "cat:com.yourcat.Cat, hat:com.yourhat.hat");
-*/
+//consumer for the marketing topics
+val marketingConsumerProps =
+    mapOf(
+        "bootstrap.servers" to "localhost:9092",
+        "auto.offset.reset" to "earliest",//the consumer start to read from an offset
+        "key.deserializer" to "org.apache.kafka.common.serialization.StringDeserializer",
+        "value.deserializer" to "org.apache.kafka.common.serialization.StringDeserializer",
+        "group.id" to "gucciMarketingGroup",
+        "security.protocol" to "PLAINTEXT",
+        "enable.auto.commit" to "true"
+    )
+val marketingKafkaConsumer = KafkaConsumer<String, String>(marketingConsumerProps)
 
 
 suspend fun <K, V> Producer<K, V>.asyncSend(record: ProducerRecord<K, V>) =
@@ -63,7 +72,7 @@ suspend fun <K, V> Producer<K, V>.asyncSend(record: ProducerRecord<K, V>) =
 
 suspend fun sendMessage(topicUrlVal: String, partition: String?, message: String) {
     kafkaProducer.asyncSend(ProducerRecord(topicUrlVal, partition, message))
-    println("A single message was successfully sent to " + topicUrlVal)
+    println("\n A single message was successfully sent to " + topicUrlVal)
     println("Message sent = " + message)
 }
 
@@ -79,11 +88,8 @@ fun receiveMessage(topicUrlVal: String): ConsumerRecords<String, String>? {
     records.iterator().forEach {
         val personJson = it.value()
         println("receiving message $personJson " )
-        /* + gson.toJson(it.value().toString())) */
     }
-    //commit the offset to kafka to avoid reprocessing the same message (a kind of)
-    //when/why do I need this ?
-    kafkaConsumer.commitAsync()
+    //I do not need to commit because autocommit is true
     return records
 }
 
