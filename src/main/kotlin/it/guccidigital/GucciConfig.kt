@@ -22,13 +22,16 @@ const val queueAccountingUrl: String = "dev-mao-accounting-events"
 const val queueOrderUrl: String = "dev-mao-order-events"
 const val queueShippingUrl: String = "dev-mao-shipping-events"
 
+const val queueErrorUrl: String = "dev-mao-error-events"
+
+
 val s3EndpointURI: URI = URI.create("http://localhost:9090")
 
 val ordersLens = Body.auto<Orders>().toLens()
 val loopMarketingTiming = 60000L
 val loopOrdersTiming = 20000L
 val loopExternalTiming = 40000L
-val httpPort = 9002
+val httpPort = 9003
 
 val charPool : List<Char> = ('a'..'z') + ('A'..'Z') + ('0'..'9')
 

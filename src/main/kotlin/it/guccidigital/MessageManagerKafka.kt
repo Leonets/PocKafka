@@ -31,6 +31,7 @@ val consumerProps =
         "security.protocol" to "PLAINTEXT"
     )
 val kafkaConsumer = KafkaConsumer<String, String>(consumerProps)
+val kafkaMarketingConsumer = KafkaConsumer<String, String>(consumerProps)
 
 //consumer for the internal topics
 val internalConsumerProps =
@@ -43,7 +44,10 @@ val internalConsumerProps =
         "security.protocol" to "PLAINTEXT",
         "enable.auto.commit" to "false"
     )
-val internalKafkaConsumer = KafkaConsumer<String, String>(internalConsumerProps)
+val internalKafkaOrderConsumer = KafkaConsumer<String, String>(internalConsumerProps)
+val internalKafkaShippingConsumer = KafkaConsumer<String, String>(internalConsumerProps)
+val internalKafkaAccountingConsumer = KafkaConsumer<String, String>(internalConsumerProps)
+
 
 //consumer for the marketing topics
 val marketingConsumerProps =
@@ -70,20 +74,19 @@ suspend fun <K, V> Producer<K, V>.asyncSend(record: ProducerRecord<K, V>) =
     }
 
 
-suspend fun sendMessage(topicUrlVal: String, partition: String?, message: String) {
-    kafkaProducer.asyncSend(ProducerRecord(topicUrlVal, partition, message))
+fun sendMessage(topicUrlVal: String, partition: String?, message: String) {
+    println("\n Sending this $message ")
+    kafkaProducer.send(ProducerRecord(topicUrlVal, partition, message))
     println("\n A single message was successfully sent to " + topicUrlVal)
-    println("Message sent = " + message)
+    //println("Message sent = " + message)
 }
 
 tailrec fun <T> repeatUntilSome(block: () -> T?): T = block() ?: repeatUntilSome(block)
 
-fun receiveMessage(topicUrlVal: String): ConsumerRecords<String, String>? {
-    kafkaConsumer.subscribe(listOf(topicUrlVal))
-
-    println(" \n Start polling over $topicUrlVal ")
+fun receiveMessage(kafkaConsumer: KafkaConsumer<String, String>): ConsumerRecords<String, String>? {
+    println(" \n Start polling over ${kafkaConsumer.subscription()} ")
     val records = kafkaConsumer.poll(Duration.ofSeconds(1))
-    println(" End polling over $topicUrlVal ")
+    println(" End polling over ${kafkaConsumer.subscription()} ")
 
     records.iterator().forEach {
         val personJson = it.value()
@@ -94,9 +97,9 @@ fun receiveMessage(topicUrlVal: String): ConsumerRecords<String, String>? {
 }
 
 fun pollMessage(topicConsumer: KafkaConsumer<String, String>): ConsumerRecords<String, String>? {
-    return topicConsumer.poll(Duration.ofSeconds(1))
+    return topicConsumer.poll(Duration.ofSeconds(60))
 }
 
 fun ackMessage(topicConsumer: KafkaConsumer<String, String>) {
-    return topicConsumer.commitAsync()
+    return topicConsumer.commitSync()
 }

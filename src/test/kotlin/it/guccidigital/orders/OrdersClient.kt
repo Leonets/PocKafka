@@ -1,8 +1,5 @@
 package it.guccidigital.orders
 
-import aws.sdk.kotlin.services.s3.S3Client
-import aws.sdk.kotlin.services.s3.model.CreateBucketRequest
-import aws.smithy.kotlin.runtime.http.Url
 import it.guccidigital.models.Order
 import it.guccidigital.models.Orders
 import org.http4k.client.JavaHttpClient
@@ -27,9 +24,9 @@ fun main()  {
     val ordersLens = Body.auto<Orders>().toLens()
 
     val myMessage = Message("hello", Email("bob@git.com"), Email("sue@git.com"))
-    val myOrder1 = Order("id1", "M", 400, "blue", "Via Roma, 2", "50144", "DE")
-    val myOrder3 = Order("id3", "M", 1100, "blue", "Rue balzac, 2", "45445", "IT")
-    val myOrder2 = Order("id2", "L", 2900, "blue", "Rue Habc 2", "45355", "SP")
+    val myOrder1 = Order("id1", "M", 1440, "blue", "Via Roma, 2", "50144", "IT")
+    val myOrder3 = Order("id3", "M", 1110, "blue", "Rue balzac, 2", "45445", "IT")
+    val myOrder2 = Order("id2", "L", 1290, "blue", "Rue Habc 2", "45355", "SP")
     val ordersList: List<Order> = listOf(myOrder1, myOrder2, myOrder3)
     val myOrders: Orders = Orders(ordersList)
 
@@ -37,11 +34,7 @@ fun main()  {
     val requestWithEmail = ordersLens(myOrders, Request(GET, "/"))
 
     //executes the request vs mulesoft
-/*    val response: Response = printingClient(requestWithEmail.method(POST).uri(Uri.of( "http://localhost:9003/api/orders")))
-    println(" output  " + response.bodyString() )*/
-
-    //executes the request vs kotlin
-    val response: Response = printingClient(requestWithEmail.method(POST).uri(Uri.of( "http://localhost:9002/orders")))
+    val response: Response = printingClient(requestWithEmail.method(POST).uri(Uri.of( "http://localhost:9003/api/orders")))
     println(" output  " + response.bodyString() )
 
 }

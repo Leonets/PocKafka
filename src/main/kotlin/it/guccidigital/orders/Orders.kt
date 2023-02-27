@@ -10,6 +10,7 @@ import kotlinx.coroutines.*
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.http4k.client.JavaHttpClient
 import org.http4k.core.*
 import org.http4k.core.Method.GET
@@ -24,6 +25,7 @@ import org.http4k.server.asServer
 import putObjectStreamAws
 import java.io.File
 import java.lang.Thread.currentThread
+import java.lang.Thread.sleep
 
 fun main() {
     val printingApp: HttpHandler = PrintRequest().then(app)
@@ -129,11 +131,12 @@ suspend fun process(it: Request) {
 }
 
 suspend fun manageOrdersTopic() {
+    kafkaConsumer.subscribe(listOf(orders_topic.toString()))
     while (true){
         try {
             delay(loopOrdersTiming) //non blocking
             //consume messages over the queue
-            val messages = receiveMessage(orders_topic.toString())
+            val messages = receiveMessage(kafkaConsumer)
             println(" \n Orders are arriving and need to be managed " )
             messages?.map {
                 singleMessage ->
@@ -150,54 +153,53 @@ suspend fun manageOrdersTopic() {
 }
 
 
-suspend fun manageOrders() {
-    coroutineScope {
+fun manageOrders() {
+    internalKafkaAccountingConsumer.subscribe(listOf(queueAccountingUrl, queueErrorUrl))
+    internalKafkaOrderConsumer.subscribe(listOf(queueOrderUrl))
+    internalKafkaShippingConsumer.subscribe(listOf(queueShippingUrl))
         while (true) {
             try {
                 //consume messages over the queues
-                manageQueue(queueAccountingUrl, "Accounting")
+                manageQueue(internalKafkaAccountingConsumer, "Accounting")
+                manageQueue(internalKafkaOrderConsumer, "Order")
+                manageQueue(internalKafkaShippingConsumer, "Shipping")
 
-                launch {//I dont' want to wait here
-                    manageQueue(queueOrderUrl, "Order")
-                }
-
-                manageQueue(queueShippingUrl, "Shipping")
-
-                delay(loopExternalTiming) //non blocking
+                sleep(loopExternalTiming) //non blocking
             } catch (ex: Exception) {
                 println("${currentThread().name} failed with {$ex}. Retrying...")
             }
             println(" >>> Some orders have been managed \n")
         }
-    }
 }
 
-private fun manageQueue(queueName: String, subsystem: String) {
-    internalKafkaConsumer.subscribe(listOf(queueName))
-    println(" \n Start polling over $queueName ")
-    val messages = pollMessage(internalKafkaConsumer)
-    println("  message from $queueName to be managed " )
+private fun manageQueue(topicConsumer: KafkaConsumer<String, String>, subsystem: String) {
+    println(" \n Start polling over ${topicConsumer.subscription()} ")
+    val messages = pollMessage(topicConsumer)
+    println("  message from ${topicConsumer.subscription()} to be managed " )
     //ask for execution to a subsytem
     messages?.map { singleMessage
         -> when(execute(singleMessage.value(), subsystem) == Status.OK) {
             true -> {
                 //ack the message !
-                ackMessage(internalKafkaConsumer)
+                ackMessage(topicConsumer)
             }
             false -> {
-                println(" subsystem unavailable $subsystem" )
+                println(" subsystem unavailable $subsystem  -- $singleMessage.value" )
+                sendMessage(queueErrorUrl,null,singleMessage.value())
+                println(" send to error topic $subsystem" )
             }
         }
     }
 }
 
 suspend fun managePriceAlerts() {
+    kafkaMarketingConsumer.subscribe(listOf(queueMarketingUrl))
     while (true){
         try {
             delay(loopMarketingTiming) //non blocking
             //consume messages over the queue
             println(" \n Marketing/Price alerts to be managed " )
-            val messages = receiveMessage(queueMarketingUrl)
+            val messages = receiveMessage(kafkaMarketingConsumer)
             //based on some business logic, send to a subsequent queue
             messages?.map {
                     singleMessage ->
@@ -231,7 +233,7 @@ fun execute(it: String, subsystem: String): Status {
     var response: Response = Response(SERVICE_UNAVAILABLE)
     val client: HttpHandler = JavaHttpClient()
     val printingClient: HttpHandler = DebuggingFilters.PrintResponse().then(client)
-    val request = Request(GET, Uri.of("http://localhost:9001/mock/${subsystem}"), it)
+    val request = Request(GET, Uri.of("http://localhost:8081/mock/${subsystem}"), it)
     //executes the request
     response = printingClient(request)
     println(" output from ${subsystem} " + response.bodyString())
