@@ -16,7 +16,13 @@ apply plugin: 'application'
 mainClassName = "it.guccidigital.GucciDemo1Kt"
 
 repositories {
+    mavenLocal()
     mavenCentral()
+    maven {
+        name "GucciOmsNexus"
+        credentials(PasswordCredentials)
+        url  "https://nexus.repos.regiongold.com/repository/oms-maven-central/"
+    }
 }
 
 apply plugin: 'kotlin'
@@ -58,6 +64,10 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8")
 
     implementation("org.apache.kafka:kafka-clients:$kafkaApiVersion")
+
+    implementation("io.github.microutils:kotlin-logging-jvm:${kotlinLoggingVersion}")
+    implementation "com.gucci.oms:oms-kotlin-kafka-container:${kafkaContainerVersion}"
+    implementation "com.gucci.oms:oms-kotlin-sqs-container:${sqsContainerVersion}"
 
     testImplementation "org.http4k:http4k-testing-approval:${http4kVersion}"
     testImplementation "org.junit.jupiter:junit-jupiter-api:${junitVersion}"

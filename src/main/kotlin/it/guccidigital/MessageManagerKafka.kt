@@ -33,6 +33,16 @@ val consumerProps =
 val kafkaConsumer = KafkaConsumer<String, String>(consumerProps)
 val kafkaMarketingConsumer = KafkaConsumer<String, String>(consumerProps)
 
+val kafkaContainerConsumerProps =
+    mapOf(
+        "bootstrap.servers" to "localhost:9092",
+        "auto.offset.reset" to "earliest",//the consumer start to read from an offset
+        "key.deserializer" to "org.apache.kafka.common.serialization.StringDeserializer",
+        "value.deserializer" to "org.apache.kafka.common.serialization.StringDeserializer",
+        "group.id" to "gucciGroupContainer",
+        "security.protocol" to "PLAINTEXT"
+    )
+
 //consumer for the internal topics
 val internalConsumerProps =
     mapOf(
@@ -47,6 +57,18 @@ val internalConsumerProps =
 val internalKafkaOrderConsumer = KafkaConsumer<String, String>(internalConsumerProps)
 val internalKafkaShippingConsumer = KafkaConsumer<String, String>(internalConsumerProps)
 val internalKafkaAccountingConsumer = KafkaConsumer<String, String>(internalConsumerProps)
+
+//consumer for the internal topics consumed by kafka container
+val kafkaInternalConsumerProps =
+    mapOf(
+        "bootstrap.servers" to "localhost:9092",
+        "auto.offset.reset" to "earliest",//the consumer start to read from an offset
+        "key.deserializer" to "org.apache.kafka.common.serialization.StringDeserializer",
+        "value.deserializer" to "org.apache.kafka.common.serialization.StringDeserializer",
+        "group.id" to "gucciInternalGroupContainer",
+        "security.protocol" to "PLAINTEXT",
+        "enable.auto.commit" to "false"
+    )
 
 
 //consumer for the marketing topics
