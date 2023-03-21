@@ -95,12 +95,6 @@ Application API are available here:
     http://localhost:9002/orders/shipping
     http://localhost:9002/orders/shipping
 
-## TODO
-
-when kafka container is stopped the rest application stops to answer to http requests
-
-manage orders function should not ack the message when the external system is unavailable
-
 ## Payload that represents Orders
 ```
 {
@@ -134,3 +128,9 @@ manage orders function should not ack the message when the external system is un
     }
 }
 ```
+
+## TODO
+
+when kafka container is stopped the rest application stops to answer to http requests
+
+manage orders function should not ack the message when the external system is unavailable
