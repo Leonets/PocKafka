@@ -129,6 +129,8 @@ Application API are available here:
 }
 ```
 
+
+
 ## TODO
 
 when kafka container is stopped the rest application stops to answer to http requests
