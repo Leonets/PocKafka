@@ -60,7 +60,7 @@ val app: HttpHandler = routes(
     },
 
     //register some routes
-    "/orders" bind Method.POST to {
+    "/api/orders" bind Method.POST to {
         println(message = " payload  " + it.toMessage())
         //save payload in the bucket and then process it
         runBlocking {
@@ -71,11 +71,11 @@ val app: HttpHandler = routes(
         Response(OK).body("Orders received")
     },
 
-    "/orders/pricing" bind Method.GET to {
+    "/api/orders/pricing" bind Method.GET to {
         println(message = " extract and show current pricing policy " )
         Response(OK).body("TO BE CONSTRUCTED")
     },
-    "/orders/shipping" bind Method.GET to {
+    "/api/orders/shipping" bind Method.GET to {
         println(message = " extract and show shipping countries " )
 
         //operation:
@@ -92,7 +92,7 @@ val app: HttpHandler = routes(
         //operation: render country and price of the orders received
         Response(status = OK).body(result1?.joinToString { "Country = ${it.destinationCountry}  Price = ${it.price}  \n" } ?: "no data")
     },
-    "/orders/dashboard" bind Method.GET to {
+    "/api/orders/dashboard" bind Method.GET to {
         println(message = " extract and show dashboard " )
 
         //operation, the same as shipping

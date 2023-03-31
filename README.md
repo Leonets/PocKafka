@@ -91,9 +91,9 @@ Queue can be monitored from here: http://localhost:9000/
 
 Application API are available here:
 
-    http://localhost:9002/orders
-    http://localhost:9002/orders/shipping
-    http://localhost:9002/orders/shipping
+    http://localhost:9003/api/orders
+    http://localhost:9003/api/shipping
+    http://localhost:9003/api/dashboard
 
 ## Payload that represents Orders
 ```
