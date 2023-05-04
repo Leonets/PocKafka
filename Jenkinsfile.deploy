@@ -1,0 +1,179 @@
+import groovy.json.JsonSlurper
+
+static def fetchImageTags(usr, psw, app, showSnapshots) {
+  String nexusQueryUrl = "https://nexus.repos.regiongold.com/service/rest/v1/search?repository=gucci-docker-dev&docker.imageName=${app}&sort=version"
+  String curlCmd = "curl -u ${usr}:${psw} '${nexusQueryUrl}'"
+  def cmd = [ 'bash', '-c', curlCmd ]
+  def result = cmd.execute().text
+  def nexusResult = new JsonSlurper().parseText(result)
+
+  if (nexusResult.items == null || nexusResult.items.size == 0)
+    return ["unable to fetch tags for ${app}"]
+
+  return nexusResult.items.findAll({ it -> ( showSnapshots  || !it.version.endsWith("SNAPSHOT") ) }).collect({ it.version }).join('\n')
+};
+
+pipeline {
+  agent { label 'aws && docker' }
+
+  options {
+      disableConcurrentBuilds()
+  }
+
+  parameters {
+    choice(name: 'ENVIRONMENT', choices: ['qa', 'pre', 'prd'], description: 'Target environment')
+    string(name: 'SOURCE_TAG', defaultValue: "", description: 'Image tag to be linked to target environment')
+  }
+  
+  environment {
+      DEV_JENKINS = credentials('dev-jenkins')
+      DOCKER_REGISTRY = "dockerdev.repos.regiongold.com"
+      DOCKER_REGISTRY_PRD = "docker.repos.regiongold.com"
+      ARTIFACT_ID = "oms-gucci-demo-kafka-wms-bridge"
+      DEPLOYMENT_TAG = "${params.ENVIRONMENT}"
+  }
+
+  stages {
+
+    stage("Select image to deploy") {
+      when {
+        expression { !(params.SOURCE_TAG)  }
+      }
+
+      steps {
+        timeout(time: 30, unit: 'SECONDS') {
+          script {
+            // Show the select input modal
+            def desc = "Available Docker Images for ${ARTIFACT_ID}"
+            def showSnapshots = !(params.ENVIRONMENT == "prd")
+            def IMAGE_TAG_TO_DEPLOY = input message: 'Please select image to deploy', ok: 'Next',
+                    parameters: [
+                                   choice(name: 'TARGET_TAG', choices: fetchImageTags(DEV_JENKINS_USR,DEV_JENKINS_PSW,ARTIFACT_ID, showSnapshots), description: desc)
+                                ]
+            env.SOURCE_TAG = "${IMAGE_TAG_TO_DEPLOY}"
+            echo "Selected Image ${ARTIFACT_ID}:${env.SOURCE_TAG} for deployment on ${params.ENVIRONMENT}"
+          }
+        }
+      }
+    }
+
+    stage("Assign Environment Variable") {
+      when {
+        expression { (params.SOURCE_TAG)  }
+      }
+
+      steps {
+          script {
+            env.SOURCE_TAG = "${params.SOURCE_TAG}"
+            echo "Selected Image ${ARTIFACT_ID}:${env.SOURCE_TAG} for deployment on ${params.ENVIRONMENT}"
+          }
+        }
+    }
+
+    stage('Apply Deployment Tag in DEV Docker registry') {
+      when {
+        expression { "${params.ENVIRONMENT}" == 'qa' || "${params.ENVIRONMENT}" == 'pre' }
+      }
+      steps {
+        echo "Tagging ${DOCKER_REGISTRY}/${ARTIFACT_ID}:${SOURCE_TAG} as ${DOCKER_REGISTRY}/${ARTIFACT_ID}:${DEPLOYMENT_TAG}"
+        sh("docker login -u ${DEV_JENKINS_USR} -p ${DEV_JENKINS_PSW} https://${DOCKER_REGISTRY}")
+        sh("docker pull ${DOCKER_REGISTRY}/${ARTIFACT_ID}:${SOURCE_TAG}")
+        sh("docker tag ${DOCKER_REGISTRY}/${ARTIFACT_ID}:${SOURCE_TAG} ${DOCKER_REGISTRY}/${ARTIFACT_ID}:${DEPLOYMENT_TAG}")
+        echo "Publish ${ARTIFACT_ID}:${DEPLOYMENT_TAG} docker image to registry https://${DOCKER_REGISTRY}"
+        sh("docker login -u ${DEV_JENKINS_USR} -p ${DEV_JENKINS_PSW} https://${DOCKER_REGISTRY}")
+        sh("docker push ${DOCKER_REGISTRY}/${ARTIFACT_ID}:${DEPLOYMENT_TAG}")
+        echo 'Image pushed successfully'
+        echo 'Cleaning up images on Agent...'
+        sh("docker rmi ${DOCKER_REGISTRY}/${ARTIFACT_ID}:${SOURCE_TAG}")
+        sh("docker rmi ${DOCKER_REGISTRY}/${ARTIFACT_ID}:${DEPLOYMENT_TAG}")
+        echo 'Cleaned up images on Agent'
+      }
+    }
+
+    stage('Redeploy ECS instance in QA') {
+      when {
+        expression { "${params.ENVIRONMENT}" == 'qa' }
+      }
+      
+      steps {
+         sh "aws --region 'us-east-1' ecs update-service --cluster 'team-ecs01' --service 'team-qa-krwmsbridge' --force-new-deployment"
+      }
+    }
+    
+    stage('Redeploy ECS instance in PREPROD') {
+      when {
+        expression { "${params.ENVIRONMENT}" == 'pre' }
+      }
+      
+      steps {
+         sh "aws --region 'us-east-1' ecs update-service --cluster 'team-ecs01' --service 'team-pre-krwmsbridge' --force-new-deployment"
+      }
+    }
+
+    stage("Print selected image for promotion") {
+      when {
+        expression { "${params.ENVIRONMENT}" == 'prd' }
+      }
+
+      steps {
+        script {
+          echo "Selected Image for promotion: ${ARTIFACT_ID}:${env.SOURCE_TAG}"
+        }
+      }
+    }
+
+    stage("Promote image to production registry") {
+      when {
+        expression { "${params.ENVIRONMENT}" == 'prd' }
+      }
+
+      steps {
+        echo "Pull ${DOCKER_REGISTRY}/${ARTIFACT_ID}:${SOURCE_TAG} docker image from registry https://${DOCKER_REGISTRY}"
+        sh("docker login -u ${DEV_JENKINS_USR} -p ${DEV_JENKINS_PSW} https://${DOCKER_REGISTRY}")
+        sh("docker pull ${DOCKER_REGISTRY}/${ARTIFACT_ID}:${SOURCE_TAG}")
+
+        echo "Tagging ${DOCKER_REGISTRY}/${ARTIFACT_ID}:${SOURCE_TAG} image as ${DOCKER_REGISTRY_PRD}/${ARTIFACT_ID}:${SOURCE_TAG}"
+        sh("docker tag ${DOCKER_REGISTRY}/${ARTIFACT_ID}:${SOURCE_TAG} ${DOCKER_REGISTRY_PRD}/${ARTIFACT_ID}:${SOURCE_TAG}")
+
+        echo "Tagging ${DOCKER_REGISTRY}/${ARTIFACT_ID}:${SOURCE_TAG} image as ${DOCKER_REGISTRY_PRD}/${ARTIFACT_ID}:${DEPLOYMENT_TAG}"
+        sh("docker tag ${DOCKER_REGISTRY}/${ARTIFACT_ID}:${SOURCE_TAG} ${DOCKER_REGISTRY_PRD}/${ARTIFACT_ID}:${DEPLOYMENT_TAG}")
+
+        echo "Publish ${DOCKER_REGISTRY_PRD}/${ARTIFACT_ID}:${SOURCE_TAG} docker image to production registry"
+        sh("docker login -u ${DEV_JENKINS_USR} -p ${DEV_JENKINS_PSW} https://${DOCKER_REGISTRY_PRD}")
+        sh("docker push ${DOCKER_REGISTRY_PRD}/${ARTIFACT_ID}:${SOURCE_TAG}")
+
+        echo "Publish ${DOCKER_REGISTRY_PRD}/${ARTIFACT_ID}:${DEPLOYMENT_TAG} docker image to production registry"
+        sh("docker login -u ${DEV_JENKINS_USR} -p ${DEV_JENKINS_PSW} https://${DOCKER_REGISTRY_PRD}")
+        sh("docker push ${DOCKER_REGISTRY_PRD}/${ARTIFACT_ID}:${DEPLOYMENT_TAG}")
+        echo 'Image pushed successfully'
+
+        sh("docker rmi ${DOCKER_REGISTRY}/${ARTIFACT_ID}:${SOURCE_TAG}")
+        sh("docker rmi ${DOCKER_REGISTRY_PRD}/${ARTIFACT_ID}:${SOURCE_TAG}")
+        sh("docker rmi ${DOCKER_REGISTRY_PRD}/${ARTIFACT_ID}:${DEPLOYMENT_TAG}")
+        echo 'Cleaned up images on Agent...'
+      }
+    }
+
+    stage('Redeploy ECS instance in PRODUCTION') {
+      when {
+        expression { "${params.ENVIRONMENT}" == 'prd' }
+      }
+
+      steps {
+        echo "Launching AWS redeploy..."
+        sh "aws --profile 'prd' --region 'us-east-1' ecs update-service --cluster 'team-ecs01' --service 'team-prd-krwmsbridge' --force-new-deployment"
+      }
+    }
+  }
+
+  post {
+    success {
+      echo 'Process completed'
+    }
+    
+    failure {
+      echo 'Process completed with failures'
+    }
+  }
+
+}
