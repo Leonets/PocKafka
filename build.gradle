@@ -13,8 +13,6 @@ buildscript {
 
 apply plugin: 'application'
 
-mainClassName = "it.guccidigital.GucciDemo1Kt"
-
 repositories {
     mavenLocal()
     mavenCentral()
